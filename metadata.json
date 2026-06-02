@@ -1,0 +1,6 @@
+{
+  "name": "File Transfer",
+  "description": "Adaptive and visually stunning application to seamlessly transfer files and send messages between PC and Android.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
