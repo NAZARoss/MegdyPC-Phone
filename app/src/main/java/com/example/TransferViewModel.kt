@@ -126,9 +126,32 @@ class TransferViewModel(application: Application) : AndroidViewModel(application
                 }
             }
 
+            override fun onFileCancelled(filename: String) {
+                viewModelScope.launch {
+                    val currentState = _transferState.value
+                    if (currentState is TransferUiState.Receiving && currentState.filename == filename) {
+                        _transferState.value = TransferUiState.Idle
+                    }
+                    _messages.value = _messages.value + TransferMessage(
+                        sender = MessageSender.PC,
+                        text = "❌ Передача файла отменена: $filename"
+                    )
+                }
+            }
+
             override fun onFileReceived(filename: String) {
                 viewModelScope.launch {
-                    addSystemMessage("Файл скачан и сохранен: $filename")
+                    val currentState = _transferState.value
+                    val isReceivingState = currentState is TransferUiState.Receiving
+                    if (isReceivingState) {
+                        addSystemMessage("Файл скачан и сохранен: $filename")
+                        _messages.value = _messages.value + TransferMessage(
+                            sender = MessageSender.PC,
+                            text = "📁 Получен файл: $filename"
+                        )
+                    } else {
+                        addSystemMessage("ПК успешно сохранил файл: $filename")
+                    }
                 }
             }
 
@@ -159,8 +182,6 @@ class TransferViewModel(application: Application) : AndroidViewModel(application
 
         viewModelScope.launch {
             currentClient.sendChatMessage(text)
-            // Add to messages manually (the PC server may/may not reflect it back)
-            _messages.value = _messages.value + TransferMessage(sender = MessageSender.Phone, text = text)
         }
     }
 
@@ -201,6 +222,31 @@ class TransferViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    fun cancelTransfer() {
+        val currentState = _transferState.value
+        if (currentState is TransferUiState.Sending) {
+            client?.cancelFileUpload()
+            val filename = currentState.filename
+            _transferState.value = TransferUiState.Idle
+            _messages.value = _messages.value + TransferMessage(
+                sender = MessageSender.Phone,
+                text = "❌ Отмена отправки файла: $filename"
+            )
+        } else if (currentState is TransferUiState.Receiving) {
+            client?.cancelFileDownload()
+            val filename = currentState.filename
+            _transferState.value = TransferUiState.Idle
+            _messages.value = _messages.value + TransferMessage(
+                sender = MessageSender.Phone,
+                text = "❌ Отмена получения файла: $filename"
+            )
+        }
+    }
+
+    fun resetTransferState() {
+        _transferState.value = TransferUiState.Idle
+    }
+
     fun rejectFileOffer() {
         _incomingFileOffer.value = null
     }
@@ -230,6 +276,10 @@ class TransferViewModel(application: Application) : AndroidViewModel(application
                 viewModelScope.launch {
                     _transferState.value = TransferUiState.Success(file.name, isUpload = true)
                     addSystemMessage("Файл отправлен: ${file.name}")
+                    _messages.value = _messages.value + TransferMessage(
+                        sender = MessageSender.Phone,
+                        text = "📁 Отправлен файл: ${file.name}"
+                    )
                     delay(3000)
                     if (_transferState.value is TransferUiState.Success) {
                         _transferState.value = TransferUiState.Idle

@@ -27,6 +27,8 @@ class NetworkClient(
 
     private val client = OkHttpClient()
     private var webSocket: WebSocket? = null
+    private var uploadCall: Call? = null
+    private var downloadCall: Call? = null
 
     private val gson = com.google.gson.Gson()
 
@@ -41,6 +43,7 @@ class NetworkClient(
         fun onDisconnected()
         fun onChatMessage(from: String, text: String)
         fun onFileAvailable(filename: String)
+        fun onFileCancelled(filename: String)
         fun onFileReceived(filename: String)
         fun onError(error: String)
     }
@@ -89,6 +92,11 @@ class NetworkClient(
                                 val filename = payload.optString("filename", "")
                                 listener?.onFileAvailable(filename)
                             }
+                            "file_cancelled" -> {
+                                val filename = payload.optString("filename", "")
+                                cancelFileDownload()
+                                listener?.onFileCancelled(filename)
+                            }
                             "file_received" -> {
                                 val filename = payload.optString("filename", "")
                                 listener?.onFileReceived(filename)
@@ -114,6 +122,10 @@ class NetworkClient(
     fun disconnect() {
         webSocket?.close(1000, "User disconnected")
         webSocket = null
+        uploadCall?.cancel()
+        uploadCall = null
+        downloadCall?.cancel()
+        downloadCall = null
     }
 
     // Отправка текстового сообщения в чат
@@ -148,13 +160,19 @@ class NetworkClient(
             .post(requestBody)
             .build()
 
-        client.newCall(request).enqueue(object : Callback {
+        val call = client.newCall(request)
+        uploadCall = call
+        call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                if (call.isCanceled()) {
+                    return
+                }
                 listener?.onError("Upload failed: ${e.localizedMessage}")
                 onUploadFailure(e.localizedMessage ?: "Unknown error")
             }
 
             override fun onResponse(call: Call, response: Response) {
+                uploadCall = null
                 if (!response.isSuccessful) {
                     listener?.onError("Upload error: ${response.code}")
                     onUploadFailure("Server returned error code: ${response.code}")
@@ -165,6 +183,11 @@ class NetworkClient(
         })
     }
 
+    fun cancelFileUpload() {
+        uploadCall?.cancel()
+        uploadCall = null
+    }
+
     // Скачивание файла с ПК (вызывается, например, после onFileAvailable)
     fun downloadFile(filename: String, onDownloadStart: () -> Unit = {}, onDownloadSuccess: () -> Unit = {}, onDownloadFailure: (String) -> Unit = {}) {
         onDownloadStart()
@@ -173,13 +196,19 @@ class NetworkClient(
             .get()
             .build()
 
-        client.newCall(request).enqueue(object : Callback {
+        val call = client.newCall(request)
+        downloadCall = call
+        call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                if (call.isCanceled()) {
+                    return
+                }
                 listener?.onError("Download failed: ${e.localizedMessage}")
                 onDownloadFailure(e.localizedMessage ?: "Unknown error")
             }
 
             override fun onResponse(call: Call, response: Response) {
+                downloadCall = null
                 if (!response.isSuccessful) {
                     listener?.onError("Download error: ${response.code}")
                     onDownloadFailure("Server response not successful: ${response.code}")
@@ -203,6 +232,11 @@ class NetworkClient(
                 }
             }
         })
+    }
+
+    fun cancelFileDownload() {
+        downloadCall?.cancel()
+        downloadCall = null
     }
 
     /**

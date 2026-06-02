@@ -274,7 +274,8 @@ fun TransferScreen(
         ) {
             TransferOverlay(
                 state = transferState,
-                onDismiss = { viewModel.connect() } // Just basic reset/cleanup wrapper
+                onDismiss = { viewModel.resetTransferState() },
+                onCancel = { viewModel.cancelTransfer() }
             )
         }
     }
@@ -709,7 +710,8 @@ fun BottomPanel(
                         containerColor = Color(0xFF005AC1),
                         disabledContainerColor = Color(0xFFF1F3F9)
                     ),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -718,14 +720,14 @@ fun BottomPanel(
                         Icon(
                             Icons.Default.CloudUpload,
                             contentDescription = "Upload trigger icon",
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(18.dp),
                             tint = if (isConnected) Color.White else Color(0xFF74777F)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             "Отправить файл",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = if (isConnected) Color.White else Color(0xFF74777F)
                         )
                     }
@@ -742,15 +744,16 @@ fun BottomPanel(
                         contentColor = Color(0xFF44474E),
                         containerColor = Color.White
                     ),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = "Clear logs", modifier = Modifier.size(18.dp), tint = Color(0xFF44474E))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Очистить", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Очистить", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -818,7 +821,8 @@ fun BottomPanel(
 @Composable
 fun TransferOverlay(
     state: TransferUiState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCancel: () -> Unit
 ) {
     val isSuccess = state is TransferUiState.Success
     val isError = state is TransferUiState.Error
@@ -1053,6 +1057,22 @@ fun TransferOverlay(
                         .height(50.dp)
                 ) {
                     Text("Готово", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                }
+            } else {
+                Spacer(modifier = Modifier.height(24.dp))
+                OutlinedButton(
+                    onClick = onCancel,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.White,
+                        containerColor = Color.Transparent
+                    ),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .widthIn(min = 160.dp)
+                        .height(50.dp)
+                ) {
+                    Text("Отмена", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
                 }
             }
         }
